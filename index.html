@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Listen to your dog and estimate what its barks mean using real acoustic analysis."
+    />
+    <title>Bark Translator 🐕</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%95%3C/text%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <h1><span class="dog">🐕</span> Bark Translator</h1>
+        <p class="tagline">
+          Point your phone at your dog, tap listen, and get a read on what
+          each bark is really about.
+        </p>
+      </header>
+
+      <section class="panel listen-panel">
+        <button id="toggle-btn" class="toggle">
+          <span class="toggle-ring"></span>
+          <span class="toggle-icon">🎙️</span>
+          <span class="toggle-label">Start listening</span>
+        </button>
+
+        <div class="meter" aria-hidden="true">
+          <div id="meter-fill" class="meter-fill"></div>
+        </div>
+
+        <p id="status" class="status">
+          Tap the button and allow microphone access to begin.
+        </p>
+
+        <label class="sensitivity">
+          <span>Sensitivity</span>
+          <input
+            id="sensitivity"
+            type="range"
+            min="0"
+            max="100"
+            value="50"
+          />
+        </label>
+      </section>
+
+      <section id="result" class="panel result" hidden>
+        <div class="result-head">
+          <span id="result-icon" class="result-icon">🐶</span>
+          <div class="result-headings">
+            <h2 id="result-label" class="result-label"></h2>
+            <p id="result-blurb" class="result-blurb"></p>
+          </div>
+        </div>
+
+        <div id="result-confidence" class="confidence"></div>
+
+        <p id="result-detail" class="result-detail"></p>
+
+        <div id="features" class="features"></div>
+
+        <div class="tips">
+          <h3>What you can do</h3>
+          <ul id="result-tips"></ul>
+        </div>
+      </section>
+
+      <section class="panel history-panel">
+        <div class="history-head">
+          <h2>Recent barks</h2>
+          <button id="clear-history" class="link-btn">Clear</button>
+        </div>
+        <p id="history-empty" class="history-empty">
+          No barks logged yet. Detected sounds will appear here.
+        </p>
+        <ul id="history" class="history"></ul>
+      </section>
+
+      <footer class="disclaimer">
+        <p>
+          <strong>Just so we're clear:</strong> dogs don't speak a human
+          language, so this is an informed estimate — not a literal
+          translation. It analyses the pitch, loudness, length, and rhythm of
+          each bark and maps them to likely emotional states using established
+          animal-bioacoustics principles (Morton's motivation-structural
+          rules). Use it as a fun, thoughtful nudge to read your dog, alongside
+          body language and context. Audio is processed entirely on your device
+          and never leaves it.
+        </p>
+      </footer>
+    </div>
+
+    <script src="js/classifier.js"></script>
+    <script src="js/audio-engine.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
