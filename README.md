@@ -18,9 +18,11 @@ web page that runs entirely in the browser (works great on a phone).
    - the likely emotional state (alert, playful, warning, demand, fear,
      whine/lonely, or calm),
    - a confidence estimate,
-   - the measured acoustic features, and
+   - the measured acoustic features,
+   - a **Replay** button to hear the captured bark back, and
    - practical tips for how to respond.
-4. Recent barks are logged in the **Recent barks** panel.
+4. Recent barks are logged in the **Recent barks** panel, each with its own
+   replay (▶︎) button so you can listen again to any of the last 25 barks.
 
 Use the **Sensitivity** slider if the app is missing quiet barks (raise it) or
 triggering on background noise (lower it).
@@ -72,6 +74,10 @@ vocalisations (Pongrácz et al., Yin & McCowan):
    - **Tonality** — a spectral-flatness measure (tonal vs. noisy/growly).
 4. **Classification** — `js/classifier.js` scores the features against seven
    reaction profiles and returns the best match with a confidence estimate.
+5. **Recording** — a parallel tap on the raw signal keeps a short rolling
+   pre-roll buffer and captures each bark's PCM samples, encoding them to a
+   16-bit WAV blob for in-app replay. Recordings live only in memory (the last
+   25 barks) and are never uploaded.
 
 ## Project structure
 

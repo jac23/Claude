@@ -12,6 +12,7 @@
     resultIcon: document.getElementById('result-icon'),
     resultLabel: document.getElementById('result-label'),
     resultBlurb: document.getElementById('result-blurb'),
+    resultPlay: document.getElementById('result-play'),
     resultDetail: document.getElementById('result-detail'),
     resultConfidence: document.getElementById('result-confidence'),
     resultTips: document.getElementById('result-tips'),
@@ -23,6 +24,16 @@
   };
 
   let history = [];
+  let currentAudioUrl = null;
+  const player = new Audio();
+
+  function playAudio(url) {
+    if (!url) return;
+    player.src = url;
+    player.currentTime = 0;
+    const p = player.play();
+    if (p && p.catch) p.catch(() => {});
+  }
 
   const engine = new window.AudioEngine({
     onLevel: (level) => {
@@ -49,6 +60,9 @@
     const pct = Math.round(confidence * 100);
     els.resultConfidence.textContent = pct + '% confidence';
     els.resultConfidence.style.setProperty('--pct', pct + '%');
+
+    currentAudioUrl = features.audioUrl || null;
+    els.resultPlay.hidden = !currentAudioUrl;
 
     els.resultTips.innerHTML = '';
     profile.tips.forEach((tip) => {
@@ -83,14 +97,17 @@
 
   function addToHistory(profile, confidence, features) {
     history.unshift({ profile, confidence, features });
-    if (history.length > 25) history.pop();
+    if (history.length > 25) {
+      const dropped = history.pop();
+      if (dropped.features.audioUrl) URL.revokeObjectURL(dropped.features.audioUrl);
+    }
     renderHistory();
   }
 
   function renderHistory() {
     els.historyEmpty.hidden = history.length > 0;
     els.history.innerHTML = '';
-    history.forEach((h) => {
+    history.forEach((h, idx) => {
       const time = new Date(h.features.timestamp).toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
@@ -99,6 +116,11 @@
       const li = document.createElement('li');
       li.className = 'history-item';
       li.style.setProperty('--accent', h.profile.color);
+      const playBtn = h.features.audioUrl
+        ? '<button class="play-btn small" type="button" data-idx="' +
+          idx +
+          '" title="Replay this bark">▶︎</button>'
+        : '';
       li.innerHTML =
         '<span class="history-icon">' +
         h.profile.icon +
@@ -113,6 +135,7 @@
         Math.round(h.confidence * 100) +
         '%</span>' +
         '</span>' +
+        playBtn +
         '<span class="history-time">' +
         time +
         '</span>';
@@ -169,8 +192,22 @@
     if (engine.isRunning) applySensitivity();
   });
 
+  els.resultPlay.addEventListener('click', () => playAudio(currentAudioUrl));
+
+  els.history.addEventListener('click', (e) => {
+    const btn = e.target.closest('.play-btn');
+    if (!btn) return;
+    const entry = history[Number(btn.dataset.idx)];
+    if (entry) playAudio(entry.features.audioUrl);
+  });
+
   els.clearHistory.addEventListener('click', () => {
+    history.forEach((h) => {
+      if (h.features.audioUrl) URL.revokeObjectURL(h.features.audioUrl);
+    });
     history = [];
+    currentAudioUrl = null;
+    els.resultPlay.hidden = true;
     renderHistory();
   });
 

@@ -25,6 +25,16 @@ class AudioEngine {
     this.timeBuf = null;
     this.freqBuf = null;
 
+    // Raw-audio capture for replay.
+    this.recorder = null; // ScriptProcessorNode
+    this.recorderSink = null; // zero-gain node to keep it pulling
+    this.preRoll = []; // rolling buffer of recent PCM chunks
+    this.preRollMaxSamples = 0;
+    this.recording = false;
+    this.recordChunks = [];
+    this.recordSampleCount = 0;
+    this.recordMaxSamples = 0;
+
     // Event-detection state.
     this.inEvent = false;
     this.eventStart = 0;
@@ -71,6 +81,23 @@ class AudioEngine {
     this.timeBuf = new Float32Array(this.analyser.fftSize);
     this.freqBuf = new Float32Array(this.analyser.frequencyBinCount);
 
+    // Tap the raw signal so we can capture and replay each bark. The
+    // ScriptProcessorNode must sit in a path to destination to fire, so route
+    // it through a muted gain node to avoid feeding the mic back to speakers.
+    const sr = this.ctx.sampleRate;
+    this.preRollMaxSamples = Math.ceil(sr * 0.25); // ~250ms of lead-in
+    this.recordMaxSamples = Math.ceil(sr * (this.maxEventMs / 1000 + 0.5));
+    this.preRoll = [];
+    if (typeof this.ctx.createScriptProcessor === 'function') {
+      this.recorder = this.ctx.createScriptProcessor(4096, 1, 1);
+      this.recorderSink = this.ctx.createGain();
+      this.recorderSink.gain.value = 0;
+      this.recorder.onaudioprocess = (e) => this._onAudio(e);
+      this.source.connect(this.recorder);
+      this.recorder.connect(this.recorderSink);
+      this.recorderSink.connect(this.ctx.destination);
+    }
+
     this._tick = this._tick.bind(this);
     this.rafId = requestAnimationFrame(this._tick);
   }
@@ -78,6 +105,15 @@ class AudioEngine {
   async stop() {
     if (this.rafId) cancelAnimationFrame(this.rafId);
     this.rafId = null;
+    if (this.recorder) {
+      this.recorder.onaudioprocess = null;
+      this.recorder.disconnect();
+      this.recorder = null;
+    }
+    if (this.recorderSink) {
+      this.recorderSink.disconnect();
+      this.recorderSink = null;
+    }
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
     this.stream = null;
     if (this.ctx) await this.ctx.close();
@@ -85,6 +121,47 @@ class AudioEngine {
     this.analyser = null;
     this.source = null;
     this.inEvent = false;
+    this.recording = false;
+    this.recordChunks = [];
+    this.preRoll = [];
+  }
+
+  _onAudio(e) {
+    const input = e.inputBuffer.getChannelData(0);
+    const chunk = new Float32Array(input); // copy; the buffer is reused
+
+    // Maintain a short rolling pre-roll so we capture the bark's attack.
+    this.preRoll.push(chunk);
+    let total = 0;
+    for (const c of this.preRoll) total += c.length;
+    while (total > this.preRollMaxSamples && this.preRoll.length > 1) {
+      total -= this.preRoll.shift().length;
+    }
+
+    if (this.recording && this.recordSampleCount < this.recordMaxSamples) {
+      this.recordChunks.push(chunk);
+      this.recordSampleCount += chunk.length;
+    }
+  }
+
+  _startRecording() {
+    // Seed with the pre-roll so the start of the bark isn't clipped.
+    this.recordChunks = this.preRoll.slice();
+    this.recordSampleCount = this.recordChunks.reduce(
+      (n, c) => n + c.length,
+      0
+    );
+    this.recording = true;
+  }
+
+  _finishRecording() {
+    this.recording = false;
+    if (!this.recordChunks.length) return null;
+    const samples = concatFloat32(this.recordChunks);
+    this.recordChunks = [];
+    this.recordSampleCount = 0;
+    const blob = encodeWav(samples, this.ctx.sampleRate);
+    return { blob, url: URL.createObjectURL(blob) };
   }
 
   _tick() {
@@ -111,6 +188,7 @@ class AudioEngine {
         this.pitchSamples = [];
         this.tonalitySamples = [];
         this.belowSince = 0;
+        this._startRecording();
         this._sampleFrame(rms);
       }
     } else {
@@ -144,7 +222,15 @@ class AudioEngine {
     this.inEvent = false;
     this.belowSince = 0;
 
-    if (durationMs < this.minEventMs) return; // too short, ignore
+    if (durationMs < this.minEventMs) {
+      // Too short — discard the captured audio too.
+      this.recording = false;
+      this.recordChunks = [];
+      this.recordSampleCount = 0;
+      return;
+    }
+
+    const audio = this._finishRecording();
 
     // Repetition rate from recent onsets within a 2.5s window.
     this.recentOnsets.push(this.eventStart);
@@ -169,8 +255,55 @@ class AudioEngine {
       repetitionHz,
       tonality,
       timestamp: Date.now(),
+      audioUrl: audio ? audio.url : null,
+      audioBlob: audio ? audio.blob : null,
     });
   }
+}
+
+// Concatenate an array of Float32Array chunks into one contiguous buffer.
+function concatFloat32(chunks) {
+  let len = 0;
+  for (const c of chunks) len += c.length;
+  const out = new Float32Array(len);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.length;
+  }
+  return out;
+}
+
+// Encode mono Float32 PCM samples as a 16-bit WAV Blob.
+function encodeWav(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const writeStr = (offset, str) => {
+    for (let i = 0; i < str.length; i++)
+      view.setUint8(offset + i, str.charCodeAt(i));
+  };
+
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true); // subchunk size
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true); // block align
+  view.setUint16(34, 16, true); // bits per sample
+  writeStr(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
+  }
+  return new Blob([view], { type: 'audio/wav' });
 }
 
 function computeRms(buf) {

@@ -230,6 +230,37 @@ body.barked {
   color: var(--text);
 }
 
+.result-headings {
+  flex: 1;
+}
+
+.play-btn {
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.play-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.play-btn:active {
+  transform: scale(0.95);
+}
+
+.play-btn.small {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
 .confidence {
   position: relative;
   height: 26px;
