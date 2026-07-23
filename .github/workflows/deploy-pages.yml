@@ -1,0 +1,48 @@
+name: Deploy to GitHub Pages
+
+# Publishes the static Bark Translator app to GitHub Pages so it can be opened
+# on a phone over HTTPS (which the microphone requires). Runs on every push to
+# the default branch, and can be triggered manually.
+on:
+  push:
+    branches:
+      - claude/update-claude-md-zshbq
+  workflow_dispatch:
+
+# Permissions the Pages deployment needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment; don't cancel an in-progress run.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        # enablement: true turns Pages on automatically if it isn't already,
+        # so no manual repository-settings change is required.
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Serve the repository root; index.html is the entry point.
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
