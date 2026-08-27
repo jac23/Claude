@@ -56,7 +56,10 @@ body.barked {
 .app {
   max-width: 560px;
   margin: 0 auto;
-  padding: 28px 18px 60px;
+  /* Respect the iPhone safe area (notch / status bar / home indicator) when
+     running full-screen as an installed app. */
+  padding: max(28px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
+    max(60px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
 }
 
 .hero {
