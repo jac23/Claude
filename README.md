@@ -27,6 +27,24 @@ web page that runs entirely in the browser (works great on a phone).
 Use the **Sensitivity** slider if the app is missing quiet barks (raise it) or
 triggering on background noise (lower it).
 
+## Install it on your phone (iOS / Android)
+
+The app is a **Progressive Web App**, so you can install it to your home screen
+and run it full-screen with its own icon — no App Store needed.
+
+**iPhone / iPad (Safari):**
+
+1. Open the hosted app in **Safari** (e.g. the GitHub Pages URL).
+2. Tap the **Share** button, then **Add to Home Screen**.
+3. Tap **Add**. A "Bark" icon appears on your home screen; open it and allow
+   microphone access when prompted.
+
+**Android (Chrome):** open the app, then use the **⋮ menu → Install app / Add
+to Home screen**.
+
+Once installed it works offline (the app shell is cached by a service worker);
+the microphone still needs to run live, of course.
+
 ## Running locally
 
 Any static file server works. For example:
