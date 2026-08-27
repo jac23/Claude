@@ -315,36 +315,31 @@ function computeRms(buf) {
 // Autocorrelation-based pitch detection. Returns fundamental in Hz, or -1.
 function detectPitch(buf, sampleRate) {
   const size = buf.length;
-  let rms = 0;
-  for (let i = 0; i < size; i++) rms += buf[i] * buf[i];
-  rms = Math.sqrt(rms / size);
-  if (rms < 0.01) return -1;
+  let energy = 0;
+  for (let i = 0; i < size; i++) energy += buf[i] * buf[i];
+  if (energy === 0 || Math.sqrt(energy / size) < 0.01) return -1;
 
   // Search lags corresponding to 150 Hz .. 2500 Hz (dog bark range).
   const minLag = Math.floor(sampleRate / 2500);
   const maxLag = Math.floor(sampleRate / 150);
 
+  // Normalise each lag by the zero-lag energy so the correlation is a
+  // scale-independent measure in ~[-1, 1]; take the strongest peak above a
+  // confidence floor. (An unnormalised sum is amplitude-dependent and never
+  // clears a fixed threshold for real-world signal levels.)
   let bestLag = -1;
   let bestCorr = 0;
-  let lastCorr = 1;
-  let foundGoodDip = false;
-
   for (let lag = minLag; lag <= maxLag; lag++) {
     let corr = 0;
     for (let i = 0; i < size - lag; i++) corr += buf[i] * buf[i + lag];
-    corr /= size - lag;
-
-    if (corr > 0.5 && corr > lastCorr) {
-      foundGoodDip = true;
-    }
-    if (foundGoodDip && corr > bestCorr) {
+    corr /= energy;
+    if (corr > bestCorr) {
       bestCorr = corr;
       bestLag = lag;
     }
-    lastCorr = corr;
   }
 
-  if (bestLag <= 0) return -1;
+  if (bestLag <= 0 || bestCorr < 0.3) return -1;
   return sampleRate / bestLag;
 }
 
